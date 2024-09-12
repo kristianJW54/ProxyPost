@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Home Page</title>
+    <script src="https://unpkg.com/htmx.org@2.0.2" integrity="sha384-Y7hw+L/jvKeWIRRkqWYfPcvVxHzVzn5REgzbawhxAuQGwX1XWe70vji+VSeHOThJ" crossorigin="anonymous"></script>
+</head>
+<body>
+<nav class="nav">
+    <label>Home</label>
+    <label>Monitor</label>
+</nav>
+<header><h4 class="app-title">ProxPost Tool</h4></header>
+<main>
+    <form class="api-tool" hx-target=".output-req" hx-include="#req">
+        <label for="req">Request</label>
+        <input type="text" id="req" name="req" placeholder="Type your endpoint here"><br><br>
+        <input type="submit" value="Submit" onclick="updateFormAction()">
+
+    </form>
+    <div><h3 id="val"></h3></div>
+    <div class="output">
+        <p>Output Here:</p>
+        <p class="output-req"></p>
+    </div>
+</main>
+
+
+<script src="api.js"></script>
+</body>
+</html>
