@@ -40,7 +40,6 @@ func QuickRequest(s *SampleData) http.HandlerFunc {
 			"headers":     headers,
 			"method":      r.Method,
 			"url":         r.URL.String(),
-			"user_agent":  r.UserAgent(),
 		}
 
 		// Combine response data and monitoring information
@@ -60,18 +59,28 @@ func QuickRequest(s *SampleData) http.HandlerFunc {
 	}
 }
 
+/// Capturing Client connects through channels
+//TODO create custom dial and listen
+//TODO catch the client connection and wrap with monitoring
+//TODO serve the connection and handler
+
+// https://pkg.go.dev/net#Dial
+// https://pkg.go.dev/net#example-Listener
+// https://pkg.go.dev/net#Conn
+// https://dev.to/hgsgtk/how-go-handles-network-and-system-calls-when-tcp-server-1nbd
+
 func main() {
 	tmpl := &server.Templates{
 		Tmpl: make(map[string]string),
 	}
-	err := tmpl.AddTemplate("home", "./ui/home.html")
+	err := tmpl.AddTemplate("home", "./public/home.html")
 	if err != nil {
 		return
 	}
 	fmt.Println(tmpl)
 
 	// Serve files from the static directory
-	fs := http.FileServer(http.Dir("./ui"))
+	fs := http.FileServer(http.Dir("./public"))
 	http.Handle("/", fs)
 
 	// Assign the handler to a specific route
