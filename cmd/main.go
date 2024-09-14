@@ -4,6 +4,8 @@ import (
 	"ProxPost/server"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
 	"strings"
 )
@@ -70,29 +72,41 @@ func QuickRequest(s *SampleData) http.HandlerFunc {
 // https://dev.to/hgsgtk/how-go-handles-network-and-system-calls-when-tcp-server-1nbd
 
 func main() {
-	tmpl := &server.Templates{
-		Tmpl: make(map[string]string),
-	}
-	err := tmpl.AddTemplate("home", "./public/home.html")
+	//tmpl := &server.Templates{
+	//	Tmpl: make(map[string]string),
+	//}
+	//err := tmpl.AddTemplate("home", "./public/home.html")
+	//if err != nil {
+	//	return
+	//}
+	//fmt.Println(tmpl)
+	//
+	//// Serve files from the static directory
+	//fs := http.FileServer(http.Dir("./public"))
+	//http.Handle("/", fs)
+	//
+	//// Assign the handler to a specific route
+	//http.Handle("/home", server.HandleTemplate(tmpl.Tmpl["home"]))
+	//
+	//sampleData := &SampleData{sd: "This is a sample string"}
+	//http.Handle("/data", QuickRequest(sampleData))
+	//
+	//// Start the server
+	//err = http.ListenAndServe(":8080", nil)
+	//if err != nil {
+	//	panic(err)
+	//}
+
+	var httpListener net.Listener
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":8080"))
 	if err != nil {
-		return
+		log.Fatalf("Failed to listen: %v", err)
 	}
-	fmt.Println(tmpl)
-
-	// Serve files from the static directory
-	fs := http.FileServer(http.Dir("./public"))
-	http.Handle("/", fs)
-
-	// Assign the handler to a specific route
-	http.Handle("/home", server.HandleTemplate(tmpl.Tmpl["home"]))
-
-	sampleData := &SampleData{sd: "This is a sample string"}
-	http.Handle("/data", QuickRequest(sampleData))
-
-	// Start the server
-	err = http.ListenAndServe(":8080", nil)
-	if err != nil {
-		panic(err)
+	listener = &server.TracedListener{}
+	//httpListener.Addr()
+	log.Printf("Listening on: %s", listener.Addr().String())
+	if err := http.Serve(httpListener, nil); err != nil {
+		log.Fatalf("Failed listning: %v", err)
 	}
-
 }
