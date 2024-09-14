@@ -97,16 +97,22 @@ func main() {
 	//	panic(err)
 	//}
 
-	var httpListener net.Listener
+	tracedListener := &server.TracedListener{
+		ClientCount: 0,
+		TraceInfo:   make(map[int]string),
+	}
 
-	listener, err := net.Listen("tcp", fmt.Sprintf(":8080"))
+	listener, err := net.Listen("tcp", ":8080")
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
-	listener = &server.TracedListener{}
+	tracedListener.Listener = listener
+
 	//httpListener.Addr()
 	log.Printf("Listening on: %s", listener.Addr().String())
-	if err := http.Serve(httpListener, nil); err != nil {
+	if err := http.Serve(tracedListener, nil); err != nil {
 		log.Fatalf("Failed listning: %v", err)
 	}
+	// TODO Look into where to launch the channel listener for client connections possible as part of serve...?
+	fmt.Println(tracedListener.TraceInfo)
 }
