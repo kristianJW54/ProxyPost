@@ -1,0 +1,63 @@
+func (srv *Server) Serve(l net.Listener) error {
+	if fn := testHookServerServe; fn != nil {
+		fn(srv, l) // call hook with unwrapped listener
+	}
+
+	origListener := l
+	l = &onceCloseListener{Listener: l}
+	defer l.Close()
+
+	if err := srv.setupHTTP2_Serve(); err != nil {
+		return err
+	}
+
+	if !srv.trackListener(&l, true) {
+		return ErrServerClosed
+	}
+	defer srv.trackListener(&l, false)
+
+	baseCtx := context.Background()
+	if srv.BaseContext != nil {
+		baseCtx = srv.BaseContext(origListener)
+		if baseCtx == nil {
+			panic("BaseContext returned a nil context")
+		}
+	}
+
+	var tempDelay time.Duration // how long to sleep on accept failure
+
+	ctx := context.WithValue(baseCtx, ServerContextKey, srv)
+	for {
+		rw, err := l.Accept()
+		if err != nil {
+			if srv.shuttingDown() {
+				return ErrServerClosed
+			}
+			if ne, ok := err.(net.Error); ok && ne.Temporary() {
+				if tempDelay == 0 {
+					tempDelay = 5 * time.Millisecond
+				} else {
+					tempDelay *= 2
+				}
+				if max := 1 * time.Second; tempDelay > max {
+					tempDelay = max
+				}
+				srv.logf("http: Accept error: %v; retrying in %v", err, tempDelay)
+				time.Sleep(tempDelay)
+				continue
+			}
+			return err
+		}
+		connCtx := ctx
+		if cc := srv.ConnContext; cc != nil {
+			connCtx = cc(connCtx, rw)
+			if connCtx == nil {
+				panic("ConnContext returned nil")
+			}
+		}
+		tempDelay = 0
+		c := srv.newConn(rw)
+		c.setState(c.rwc, StateNew, runHooks) // before Serve can return
+		go c.serve(connCtx)
+	}
+}
