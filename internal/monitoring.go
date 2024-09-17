@@ -18,6 +18,7 @@ type ConnEvents struct {
 }
 
 type HeaderInfo struct {
+	Host           string
 	Status         string
 	Accept         string
 	AcceptEncoding string
