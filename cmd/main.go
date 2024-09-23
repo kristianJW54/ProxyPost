@@ -56,7 +56,7 @@ func main() {
 	http.Handle("/", fs)
 
 	// Assign the handler to a specific route
-	http.Handle("/home", server.HandleTemplate(tmpl.Tmpl["home"]))
+	http.Handle("/", server.HandleTemplate(tmpl.Tmpl["home"]))
 
 	sampleData := &SampleData{sd: "This is a sample string"}
 	http.Handle("/data", QuickRequest(sampleData))
