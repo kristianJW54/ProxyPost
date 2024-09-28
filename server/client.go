@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,113 +10,117 @@ import (
 
 type ClientContext struct {
 	*http.Client
+	ClientCount  int
+	RequestCount int // basic right now with no rate limiting
 }
 
-// NewClientContext Initialize ClientContext with a default HTTP client
+// NewClientContext initializes ClientContext with a default HTTP client
 func NewClientContext() *ClientContext {
 	return &ClientContext{
 		&http.Client{Timeout: 5 * time.Second}, // Example timeout
+		0,
+		0,
 	}
 }
 
-// TODO move User to it's own module and handle
-
 type User struct {
-	//User with token and permissions
-	//Session management
-	//Individual rate limiting?
-	RequestHistory []string
+	Name           string
+	Token          string
+	RequestHistory *RequestHistory
 	mu             sync.Mutex
 }
 
-// ClientAPI will populate with the user and their request via middleware prior to sending the client request
-type ClientAPI struct {
-	client      *ClientContext
-	User        *User
-	RequestInfo Request
+type RequestHistory struct {
+	Request   *Request
+	TimeStamp time.Time
 }
 
+type ClientAPI struct {
+	Client      *ClientContext
+	User        *User
+	RequestInfo *Request
+	mu          sync.Mutex // Protect RequestInfo from concurrent access
+}
+
+// Request should be used as value and not changed during a client request
+// The struct will hold request details for the client request and add these to a pointed value for a User and their
+// RequestHistory
 type Request struct {
 	URL     string
 	Method  string
-	Body    io.Reader
+	Body    ReqBody
 	Headers map[string]string
 }
 
-//Request data structure with everything in
+type ReqBody struct {
+	Body io.Reader
+}
 
-// un-exported functions above to provide logic for client requests to use in the below Compiled Methods
+// SendAPIRequest will wrap and call the sendRequest
+// SendAPIRequest should be concurrent safe
+func (c *ClientAPI) SendAPIRequest(url, method string, body io.Reader) {
+	// Locking to safely update RequestInfo
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-func sendRequest(ctx context.Context, c *ClientAPI) error {
+	// Initialize RequestInfo
+	c.RequestInfo = &Request{
+		URL:    url,
+		Method: method,
+		Headers: map[string]string{
+			"Accept": "application/json",
+		},
+	}
 
-	// Setting up the request
-	req, err := http.NewRequestWithContext(ctx, c.RequestInfo.Method, c.RequestInfo.URL, c.RequestInfo.Body)
+	// Only set body for methods that require it
+	if method == http.MethodPost || method == http.MethodPut {
+		c.RequestInfo.Body = ReqBody{Body: body} // Set body if needed.
+	}
+
+	// Send the request in a goroutine
+	go func() {
+		fmt.Printf("Attempting to send request: %+v\n", c.RequestInfo) // Debug logging
+		err := sendRequest(c)                                          // Call sendRequest without context
+		if err != nil {
+			fmt.Printf("error sending request: %v\n", err)
+		}
+	}()
+}
+
+// sendRequest sends the HTTP request and logs the response
+func sendRequest(c *ClientAPI) error {
+	fmt.Printf("Sending request to URL: %s with method: %s\n", c.RequestInfo.URL, c.RequestInfo.Method)
+
+	if c.RequestInfo == nil {
+		return fmt.Errorf("RequestInfo is nil")
+	}
+	fmt.Printf("RequestInfo: %+v\n", c.RequestInfo)
+
+	req, err := http.NewRequest(c.RequestInfo.Method, c.RequestInfo.URL, c.RequestInfo.Body.Body)
 	if err != nil {
 		return fmt.Errorf("error forming request: %v", err)
 	}
 
-	if len(c.RequestInfo.Headers) == 0 {
-		//set basic headers for request
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Accept", "application/json")
-	}
-
+	// Set headers
 	req.Header.Set("User-Agent", "go-proxpost-Runtime")
 	for key, value := range c.RequestInfo.Headers {
 		req.Header.Set(key, value)
 	}
 
-	// Continue with request
-	resp, err := c.client.Do(req)
+	resp, err := c.Client.Do(req)
 	if err != nil {
 		return fmt.Errorf("error sending request: %v", err)
 	}
 	defer resp.Body.Close()
 
+	// Read and log response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("error reading response body: %v", err)
 	}
-
-	fmt.Printf("Response: %s\n", string(body))
-
-	// Mutex lock and add request information to user data and history
-	// Also apply rate limiting logic here...?
+	fmt.Printf("Response status: %s\n", resp.Status)
+	fmt.Printf("Host: %s\n", req.UserAgent())
+	fmt.Printf("Response body: %s\n", string(body))
 
 	return nil
-}
-
-//TODO Consider SendAPIRequest taking a context and channel to collect response...
-
-// SendAPIRequest Will wrap and call the sendRequest
-// SendAPIRequest should be concurrent safe
-func (c *ClientAPI) SendAPIRequest(url, method string, body io.Reader) {
-
-	// Will receive the dependencies of the user from within the middleware function
-	// to be handled here before sending request
-
-	//Dependencies for the sendRequest internal method to run
-	//Maybe user and session...?
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Update request information.
-	c.RequestInfo = Request{
-		URL:    url,
-		Method: method,
-		Body:   body, // Set body if needed.
-		Headers: map[string]string{
-			"Content-Type": "application/json",
-			"Accept":       "application/json",
-		},
-	}
-
-	//sendRequest()
-	go func() {
-		err := sendRequest(ctx, c)
-		if err != nil {
-			fmt.Errorf("error sending request: %v", err)
-		}
-	}()
 }

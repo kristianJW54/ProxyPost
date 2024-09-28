@@ -2,29 +2,46 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Home Page</title>
-    <script src="https://unpkg.com/htmx.org@2.0.2" integrity="sha384-Y7hw+L/jvKeWIRRkqWYfPcvVxHzVzn5REgzbawhxAuQGwX1XWe70vji+VSeHOThJ" crossorigin="anonymous"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Form</title>
 </head>
 <body>
-<nav class="nav">
-    <label>Home</label>
-    <label>Monitor</label>
-</nav>
-<header><h4 class="app-title">ProxPost Tool</h4></header>
-<main>
-    <form class="api-tool">
-        <label for="req">Request</label>
-        <input type="text" id="req" name="req" placeholder="Type your endpoint here"><br><br>
-    </form>
-    <button name="Submit" onclick="handleSubmit()">Submit</button>
-    <div><h3 id="val"></h3></div>
-    <div class="output">
-        <p>Output Here:</p>
-        <p class="output-req"></p>
-    </div>
-</main>
 
+<form id="user-input-form">
+    <label for="user-input">Enter anything:</label>
+    <input type="text" id="user-input" name="inputText" placeholder="Type anything here"><br><br>
+    <input type="submit" value="Submit">
+</form>
 
-<script src="api.js"></script>
+<div><h3 id="response-output"></h3></div>
+
+<script>
+    document.getElementById("user-input-form").addEventListener("submit", function(event) {
+        event.preventDefault();
+
+        const inputText = document.getElementById("user-input").value;
+
+        // Check if there's an input before making the request
+        if (!inputText) {
+            alert("Please enter some text!");
+            return;
+        }
+
+        // Make a POST request to the server with the input as JSON
+        fetch("/sendInput", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json", // Make sure the content type is correct
+            },
+            body: JSON.stringify({ inputText: inputText }) // Send the input as JSON
+        })
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById("response-output").textContent = "Server Response: " + data;
+            })
+            .catch(error => console.error("Error:", error));
+    });
+</script>
+
 </body>
 </html>
